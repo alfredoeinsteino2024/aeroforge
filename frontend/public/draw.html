@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroForge — Shape Designer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0a0e1a; color: #e0e6f0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; background: #0d1220; border-bottom: 1px solid #1e2d4a; flex-shrink: 0; }
+    header h1 { font-size: 18px; font-weight: 700; color: #60aaff; }
+    header a { font-size: 12px; color: #3a5a8a; text-decoration: none; }
+    header a:hover { color: #60aaff; }
+    .layout { display: grid; grid-template-columns: 1fr 300px; flex: 1; overflow: hidden; }
+    .canvas-area { display: flex; flex-direction: column; background: #080c16; overflow: hidden; }
+    .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #0d1220; border-bottom: 1px solid #1e2d4a; flex-shrink: 0; }
+    .tool-btn { padding: 6px 14px; border: 1px solid #1e2d4a; background: #131929; color: #6a7a9a; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+    .tool-btn:hover { background: #1a2840; color: #c0d0f0; }
+    .tool-btn.active { background: #1a4fd6; color: #fff; border-color: #2260ff; }
+    .tool-btn.danger { background: #2a1010; color: #e05050; border-color: #3a1a1a; }
+    .tool-btn.danger:hover { background: #3a1a1a; }
+    .tool-btn.go { background: #0e4020; color: #40cc80; border-color: #1a6030; }
+    .tool-btn.go:hover { background: #1a6030; }
+    .tool-btn.view3d { background: #1a2a50; color: #80c0ff; border-color: #2a4a80; font-weight: 600; }
+    .tool-btn.view3d:hover { background: #1a4fd6; color: #fff; border-color: #2260ff; }
+    .tool-btn.view3d:disabled { background: #131929; color: #2a3a5a; border-color: #1e2d4a; cursor: not-allowed; }
+    .hint { font-size: 11px; color: #2a3a5a; margin-left: auto; }
+    #draw-canvas { flex: 1; display: block; width: 100%; }
+    .sidebar { background: #0d1220; border-left: 1px solid #1e2d4a; display: flex; flex-direction: column; gap: 12px; padding: 16px; overflow-y: auto; }
+    .section-title { font-size: 11px; font-weight: 600; color: #3a5a8a; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+    .card { background: #131929; border: 1px solid #1e2d4a; border-radius: 10px; padding: 14px; }
+    .control-group { margin-bottom: 10px; }
+    .control-group:last-child { margin-bottom: 0; }
+    .control-group label { display: flex; justify-content: space-between; font-size: 12px; color: #6a7a9a; margin-bottom: 4px; }
+    .control-group label span { color: #c0d0f0; font-weight: 600; }
+    input[type=range] { width: 100%; accent-color: #60aaff; }
+    .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .result-box { background: #0d1526; border: 1px solid #1e2d4a; border-radius: 8px; padding: 10px; text-align: center; }
+    .result-box .rlabel { font-size: 10px; color: #3a5a8a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .result-box .rnum { font-size: 20px; font-weight: 700; color: #60aaff; }
+    .result-box.good .rnum { color: #40cc80; }
+    .result-box.warn .rnum { color: #f0a030; }
+    .result-box.bad  .rnum { color: #e05050; }
+    .result-box .runit { font-size: 10px; color: #2a3a5a; margin-top: 2px; }
+    .verdict { padding: 12px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: center; margin-top: 4px; }
+    .verdict.good { background: #0a2a14; color: #40cc80; border: 1px solid #1a4a24; }
+    .verdict.warn { background: #2a1a00; color: #f0a030; border: 1px solid #4a3000; }
+    .verdict.bad  { background: #2a0a0a; color: #e05050; border: 1px solid #4a1a1a; }
+    .verdict.idle { background: #131929; color: #3a5a8a; border: 1px solid #1e2d4a; }
+    .status { font-size: 11px; text-align: center; color: #3a6a9a; }
+    .status.ready { color: #40cc80; }
+    .status.error { color: #e05050; }
+    canvas#chart { width: 100%; height: 120px; display: block; margin-top: 8px; }
+    .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .preset-btn { padding: 7px; background: #0d1526; border: 1px solid #1e2d4a; border-radius: 6px; font-size: 11px; color: #6a7a9a; cursor: pointer; text-align: center; transition: all 0.15s; }
+    .preset-btn:hover { background: #1a2840; color: #c0d0f0; border-color: #2a4a6a; }
+    .edit-hint { background: #0a1a0a; border: 1px solid #1a3a1a; border-radius: 8px; padding: 10px; font-size: 11px; color: #3a7a3a; line-height: 1.7; }
+    .edit-hint b { color: #40cc80; }
+    /* 3D launch flash */
+    @keyframes flashGlow {
+      0%   { box-shadow: 0 0 0px #60aaff; }
+      50%  { box-shadow: 0 0 16px #60aaff; }
+      100% { box-shadow: 0 0 0px #60aaff; }
+    }
+    .tool-btn.view3d.pulse { animation: flashGlow 0.5s ease; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ AeroForge — Shape Designer</h1>
+  <a href="index.html">← Back to parametric mode</a>
+</header>
+
+<div class="layout">
+  <div class="canvas-area">
+    <div class="toolbar">
+      <button class="tool-btn active" id="btn-draw" onclick="setMode('draw')">✏️ Draw</button>
+      <button class="tool-btn" id="btn-edit" onclick="setMode('edit')">✋ Edit Points</button>
+      <button class="tool-btn danger" onclick="clearCanvas()">🗑 Clear</button>
+      <button class="tool-btn go" onclick="simulate()">▶ Simulate</button>
+      <button class="tool-btn view3d" id="btn-3d" onclick="viewIn3D()" disabled>🔭 View in 3D</button>
+      <button class="tool-btn" id="saveBtn" onclick="saveDesign()" style="background:#1a2a4a;color:#60aaff;border-color:#2a4a6a;" disabled>💾 Save</button>
+      <button class="tool-btn" onclick="showGallery()" style="background:#1a2a4a;color:#60aaff;border-color:#2a4a6a;">📂 Gallery</button>
+      <span class="hint" id="hint">Click to place points — double-click or snap to first point to close</span>
+    </div>
+    <canvas id="draw-canvas"></canvas>
+  </div>
+
+  <div class="sidebar">
+    <div class="card">
+      <div class="section-title">Shape Presets</div>
+      <div class="presets">
+        <div class="preset-btn" onclick="loadPreset('rectangular')">Rectangular</div>
+        <div class="preset-btn" onclick="loadPreset('tapered')">Tapered</div>
+        <div class="preset-btn" onclick="loadPreset('delta')">Delta</div>
+        <div class="preset-btn" onclick="loadPreset('swept')">Swept</div>
+        <div class="preset-btn" onclick="loadPreset('elliptical')">Elliptical</div>
+        <div class="preset-btn" onclick="loadPreset('flying_wing')">Flying Wing</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Edit Controls</div>
+      <div class="edit-hint">
+        <b>Drag</b> any point to move it<br>
+        <b>Click edge</b> between points to add a new point<br>
+        <b>Right-click</b> any point to delete it<br>
+        <b>Undo:</b> Ctrl+Z to undo last change
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Flight Conditions</div>
+      <div class="control-group">
+        <label>Angle of Attack <span id="aoaVal">5°</span></label>
+        <input type="range" id="aoa" min="-5" max="20" value="5" step="0.5"
+               oninput="aoaVal.textContent=this.value+'°'; if(hasShape) simulate()">
+      </div>
+      <div class="control-group">
+        <label>Airspeed <span id="velVal">50 m/s</span></label>
+        <input type="range" id="velocity" min="10" max="300" value="50" step="5"
+               oninput="velVal.textContent=this.value+' m/s'; if(hasShape) simulate()">
+      </div>
+      <div class="control-group">
+        <label>Dihedral <span id="dhVal">0°</span></label>
+        <input type="range" id="dihedral" min="0" max="15" value="0" step="0.5"
+               oninput="dhVal.textContent=this.value+'°'; if(hasShape) simulate()">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">Aerodynamic Results</div>
+      <div class="results-grid">
+        <div class="result-box" id="box-cl"><div class="rlabel">Lift CL</div><div class="rnum" id="res-cl">—</div><div class="runit">coeff</div></div>
+        <div class="result-box" id="box-cd"><div class="rlabel">Drag CD</div><div class="rnum" id="res-cd">—</div><div class="runit">coeff</div></div>
+        <div class="result-box" id="box-ld"><div class="rlabel">L/D</div><div class="rnum" id="res-ld">—</div><div class="runit">ratio</div></div>
+        <div class="result-box" id="box-cm"><div class="rlabel">Pitch CM</div><div class="rnum" id="res-cm">—</div><div class="runit">moment</div></div>
+      </div>
+      <div class="verdict idle" id="verdict">Draw a wing shape to simulate</div>
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div class="status" id="status">Initializing engine...</div>
+  </div>
+</div>
+
+<script src="aero.js"></script>
+<script>
+
+/* ── WASM ── */
+let engine=null;
+const POLY_SIZE=1048, RESULT_SIZE=48;
+let polyPtr=null, resultPtr=null;
+
+AeroEngine().then(mod=>{
+  engine=mod;
+  polyPtr=mod._malloc(POLY_SIZE);
+  resultPtr=mod._malloc(RESULT_SIZE);
+  document.getElementById('status').textContent='Engine ready ✓';
+  document.getElementById('status').className='status ready';
+}).catch(e=>{
+  document.getElementById('status').textContent='Engine failed: '+e;
+  document.getElementById('status').className='status error';
+});
+
+/* ── STATE ── */
+const canvas=document.getElementById('draw-canvas');
+const ctx=canvas.getContext('2d');
+let points=[];
+let closed=false, hasShape=false;
+let mode='draw';
+let dragIdx=-1, hoverIdx=-1, hoverEdge=-1;
+let hovering={x:0,y:0};
+let history=[];
+
+/* ── RESIZE ── */
+function resizeCanvas(){
+  const area=canvas.parentElement;
+  canvas.width=area.clientWidth;
+  canvas.height=area.clientHeight-44;
+  redraw();
+}
+window.addEventListener('resize',resizeCanvas);
+setTimeout(resizeCanvas,50);
+
+/* ── MODE ── */
+function setMode(m){
+  mode=m;
+  document.getElementById('btn-draw').classList.toggle('active',m==='draw');
+  document.getElementById('btn-edit').classList.toggle('active',m==='edit');
+  canvas.style.cursor=m==='draw'?'crosshair':'default';
+  document.getElementById('hint').textContent=
+    m==='draw'
+      ?'Click to place points — double-click or snap to first point to close'
+      :'Drag points to move • Click edge to add • Right-click point to delete';
+}
+
+/* ── HELPERS ── */
+function getPos(e){
+  const r=canvas.getBoundingClientRect();
+  return {x:e.clientX-r.left, y:e.clientY-r.top};
+}
+
+function nearPoint(mx,my,r){
+  for(let i=0;i<points.length;i++){
+    const dx=mx-points[i].x,dy=my-points[i].y;
+    if(Math.sqrt(dx*dx+dy*dy)<r) return i;
+  }
+  return -1;
+}
+
+function nearEdge(mx,my,r){
+  if(points.length<2) return -1;
+  for(let i=0;i<points.length;i++){
+    const a=points[i], b=points[(i+1)%points.length];
+    const dx=b.x-a.x, dy=b.y-a.y;
+    const len2=dx*dx+dy*dy;
+    if(len2<1) continue;
+    const t=Math.max(0,Math.min(1,((mx-a.x)*dx+(my-a.y)*dy)/len2));
+    const px=a.x+t*dx, py=a.y+t*dy;
+    if(Math.sqrt((mx-px)**2+(my-py)**2)<r) return i;
+  }
+  return -1;
+}
+
+function saveHistory(){
+  history.push(points.map(p=>({...p})));
+  if(history.length>30) history.shift();
+}
+
+/* ── UNDO ── */
+document.addEventListener('keydown',e=>{
+  if(!e.ctrlKey||e.key!=='z') return;
+  if(points.length===0 && lastCleared){
+    points=lastCleared.points.map(p=>({...p}));
+    closed=lastCleared.closed;
+    hasShape=lastCleared.hasShape;
+    lastCleared=null;
+    setMode('edit');
+    document.getElementById('hint').textContent=
+      'Shape recovered — drag points to edit • right-click to delete • Ctrl+Z to undo';
+    redraw(); if(hasShape) simulate();
+    return;
+  }
+  if(history.length>0){
+    points=history.pop();
+    if(points.length>=3){ closed=true; hasShape=true; simulate(); }
+    else{ closed=false; hasShape=false; }
+    redraw();
+  }
+});
+
+/* ── MOUSE EVENTS ── */
+canvas.addEventListener('mousemove',e=>{
+  const {x,y}=getPos(e);
+  hovering={x,y};
+  if(dragIdx>=0){
+    points[dragIdx]={x,y};
+    redraw();
+    if(closed) simulate();
+    return;
+  }
+  if(closed){
+    const pi=nearPoint(x,y,12);
+    const ei=pi>=0?-1:nearEdge(x,y,8);
+    if(pi!==hoverIdx||ei!==hoverEdge){
+      hoverIdx=pi; hoverEdge=ei;
+      canvas.style.cursor=pi>=0?'grab':ei>=0?'copy':'default';
+      redraw();
+    }
+  } else {
+    redraw();
+  }
+});
+
+canvas.addEventListener('mousedown',e=>{
+  const {x,y}=getPos(e);
+  if(e.button===2){
+    if(!closed) return;
+    const pi=nearPoint(x,y,14);
+    if(pi>=0&&points.length>3){
+      saveHistory();
+      points.splice(pi,1);
+      hoverIdx=-1;
+      redraw(); simulate();
+    }
+    return;
+  }
+  if(!closed) return;
+  const pi=nearPoint(x,y,12);
+  if(pi>=0){
+    saveHistory();
+    dragIdx=pi;
+    canvas.style.cursor='grabbing';
+    return;
+  }
+  const ei=nearEdge(x,y,8);
+  if(ei>=0){
+    saveHistory();
+    points.splice(ei+1,0,{x,y});
+    dragIdx=ei+1;
+    canvas.style.cursor='grabbing';
+    redraw(); simulate();
+  }
+});
+
+canvas.addEventListener('mouseup',()=>{
+  if(dragIdx>=0){
+    dragIdx=-1;
+    canvas.style.cursor=closed?'default':'crosshair';
+    simulate();
+  }
+});
+
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+canvas.addEventListener('click',e=>{
+  if(closed||mode!=='draw') return;
+  const {x,y}=getPos(e);
+  if(points.length>2){
+    const dx=x-points[0].x, dy=y-points[0].y;
+    if(Math.sqrt(dx*dx+dy*dy)<16){ closeShape(); return; }
+  }
+  points.push({x,y});
+  redraw();
+});
+
+canvas.addEventListener('dblclick',()=>{
+  if(!closed&&points.length>2) closeShape();
+});
+
+function closeShape(){
+  closed=true; hasShape=true;
+  setMode('edit');
+  document.getElementById('hint').textContent=
+    'Drag points to move • Click edge to add • Right-click point to delete • Ctrl+Z to undo';
+  /* enable View in 3D once shape is closed */
+  document.getElementById('btn-3d').disabled=false;
+  redraw(); simulate();
+}
+
+let lastCleared = null;
+
+function clearCanvas(){
+  if(points.length>2){
+    lastCleared = { points: points.map(p=>({...p})), closed, hasShape };
+    document.getElementById('hint').textContent=
+      'Cleared — press Ctrl+Z to recover your shape';
+  }
+  points=[]; closed=false; hasShape=false; history=[];
+  dragIdx=-1; hoverIdx=-1; hoverEdge=-1;
+  document.getElementById('btn-3d').disabled=true;
+  setMode('draw');
+  document.getElementById('verdict').textContent='Draw a wing shape to simulate';
+  document.getElementById('verdict').className='verdict idle';
+  ['res-cl','res-cd','res-ld','res-cm'].forEach(id=>
+    document.getElementById(id).textContent='—');
+  redraw();
+}
+
+/* ── VIEW IN 3D ── */
+function viewIn3D(){
+  if(!hasShape||points.length<3) return;
+
+  /* normalise points to a [-1..1, -1..1] space so index.html is scale-independent */
+  let minX=points[0].x, maxX=points[0].x;
+  let minY=points[0].y, maxY=points[0].y;
+  points.forEach(p=>{
+    if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
+    if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
+  });
+  const scaleX = maxX>minX ? 2/(maxX-minX) : 1;
+  const scaleY = maxY>minY ? 2/(maxY-minY) : 1;
+
+  /*
+   * Canvas convention: x = chord (→), y = span (↓ on screen = tip direction)
+   * We store them normalised so index.html can scale freely.
+   * chord_norm ∈ [0,1]  (0=leading edge side, 1=trailing edge side)
+   * span_norm  ∈ [0,1]  (0=root, 1=tip)  — we use abs so the shape is
+   *                      treated as one semi-span; index.html mirrors it.
+   */
+  const normalised = points.map(p=>({
+    cx: (p.x - minX) / (maxX - minX),   /* chord axis 0..1 */
+    sy: (p.y - minY) / (maxY - minY)    /* span  axis 0..1 */
+  }));
+
+  /* also pass current flight conditions so index.html can pre-fill sliders */
+  const payload = {
+    points: normalised,
+    aoa:      parseFloat(document.getElementById('aoa').value),
+    velocity: parseFloat(document.getElementById('velocity').value),
+    dihedral: parseFloat(document.getElementById('dihedral').value),
+    timestamp: Date.now()
+  };
+
+  try {
+    localStorage.setItem('aeroforge_custom_shape', JSON.stringify(payload));
+  } catch(e) {
+    alert('Could not save shape to localStorage: ' + e.message);
+    return;
+  }
+
+  /* brief flash before navigating */
+  const btn = document.getElementById('btn-3d');
+  btn.classList.add('pulse');
+  btn.textContent = '🚀 Launching…';
+  setTimeout(()=>{ window.location.href='index.html'; }, 400);
+}
+
+/* ── DRAW ── */
+function redraw(){
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='#0e1828'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.strokeStyle='#1a2840'; ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();
+
+  if(points.length===0){
+    ctx.fillStyle='#1a2840'; ctx.font='14px Segoe UI'; ctx.textAlign='center';
+    ctx.fillText('Draw your wing planform — top-down view',W/2,H/2-10);
+    ctx.font='12px Segoe UI';
+    ctx.fillText('Vertical = span direction   Horizontal = chord direction',W/2,H/2+14);
+    return;
+  }
+
+  if(closed){
+    ctx.beginPath();
+    ctx.moveTo(points[0].x,points[0].y);
+    points.forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.closePath();
+    ctx.fillStyle='rgba(26,79,214,0.18)'; ctx.fill();
+  }
+
+  if(closed&&hoverEdge>=0&&hoverIdx<0){
+    const a=points[hoverEdge], b=points[(hoverEdge+1)%points.length];
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle='#40cc80'; ctx.lineWidth=3; ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x,points[0].y);
+  points.forEach(p=>ctx.lineTo(p.x,p.y));
+  if(closed) ctx.closePath();
+  else ctx.lineTo(hovering.x,hovering.y);
+  ctx.strokeStyle=closed?'#60aaff':'#3a6aaa';
+  ctx.lineWidth=closed?2:1.5;
+  ctx.setLineDash(closed?[]:[5,4]);
+  ctx.stroke(); ctx.setLineDash([]);
+
+  points.forEach((p,i)=>{
+    const isHov=closed&&i===hoverIdx;
+    const isDrg=i===dragIdx;
+    const r=isDrg?9:isHov?8:i===0?7:5;
+    ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+    ctx.fillStyle=isDrg?'#40cc80':isHov?'#ffffff':i===0?'#60aaff':'#2a5aaa';
+    ctx.fill();
+    ctx.strokeStyle='#60aaff'; ctx.lineWidth=1.5; ctx.stroke();
+    if(isHov&&closed){
+      ctx.fillStyle='#ffaaaa'; ctx.font='10px Segoe UI'; ctx.textAlign='left';
+      ctx.fillText('drag to move',p.x+12,p.y-14);
+      ctx.fillStyle='#e05050';
+      ctx.fillText('right-click to delete',p.x+12,p.y-2);
+    }
+  });
+
+  if(closed&&hoverEdge>=0&&hoverIdx<0){
+    ctx.beginPath(); ctx.arc(hovering.x,hovering.y,5,0,Math.PI*2);
+    ctx.fillStyle='#40cc80'; ctx.fill();
+    ctx.fillStyle='#40cc80'; ctx.font='10px Segoe UI'; ctx.textAlign='left';
+    ctx.fillText('click to add point',hovering.x+10,hovering.y-8);
+  }
+
+  if(!closed&&points.length>2){
+    const dx=hovering.x-points[0].x, dy=hovering.y-points[0].y;
+    if(Math.sqrt(dx*dx+dy*dy)<16){
+      ctx.beginPath(); ctx.arc(points[0].x,points[0].y,14,0,Math.PI*2);
+      ctx.strokeStyle='#40cc80'; ctx.lineWidth=2; ctx.stroke();
+      ctx.fillStyle='#40cc80'; ctx.font='11px Segoe UI'; ctx.textAlign='left';
+      ctx.fillText('click to close',points[0].x+16,points[0].y+4);
+    }
+  }
+
+  ctx.fillStyle='#2a4a6a'; ctx.font='11px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('← chord direction →',W/2,H-8);
+  ctx.save(); ctx.translate(12,H/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('← span →',0,0); ctx.restore();
+}
+
+/* ── PRESETS ── */
+function loadPreset(name){
+  const W=canvas.width, H=canvas.height;
+  const cx=W/2, cy=H/2;
+  const s=Math.min(W,H)*0.38;
+  const p={
+    rectangular:[
+      {x:cx-s*0.25,y:cy-s},{x:cx+s*0.25,y:cy-s},
+      {x:cx+s*0.25,y:cy+s},{x:cx-s*0.25,y:cy+s}
+    ],
+    tapered:[
+      {x:cx-s*0.25,y:cy-s},{x:cx+s*0.25,y:cy-s},
+      {x:cx+s*0.12,y:cy+s},{x:cx-s*0.12,y:cy+s}
+    ],
+    delta:[
+      {x:cx,y:cy-s},
+      {x:cx+s*0.5,y:cy+s},
+      {x:cx-s*0.5,y:cy+s}
+    ],
+    swept:[
+      {x:cx+s*0.05,y:cy-s},{x:cx+s*0.3,y:cy-s},
+      {x:cx+s*0.35,y:cy+s},{x:cx-s*0.25,y:cy+s}
+    ],
+    elliptical:(()=>{
+      const pts=[];
+      for(let i=0;i<16;i++){
+        const a=i/16*Math.PI*2;
+        pts.push({x:cx+Math.cos(a)*s*0.28,y:cy+Math.sin(a)*s});
+      }
+      return pts;
+    })(),
+    flying_wing:[
+      {x:cx,y:cy-s*0.1},
+      {x:cx+s*0.5,y:cy-s},
+      {x:cx+s*0.55,y:cy+s*0.2},
+      {x:cx+s*0.25,y:cy+s*0.5},
+      {x:cx,y:cy+s*0.4},
+      {x:cx-s*0.25,y:cy+s*0.5},
+      {x:cx-s*0.55,y:cy+s*0.2},
+      {x:cx-s*0.5,y:cy-s}
+    ]
+  };
+  points=p[name]||[]; closed=true; hasShape=true; history=[];
+  document.getElementById('btn-3d').disabled=false;
+  setMode('edit');
+  document.getElementById('hint').textContent=
+    'Drag points to move • Click edge to add • Right-click point to delete • Ctrl+Z to undo';
+  redraw(); simulate();
+}
+
+/* ── SIMULATE ── */
+function simulate(){
+  if(!engine||!hasShape||points.length<3) return;
+  let minY=points[0].y,maxY=points[0].y,minX=points[0].x,maxX=points[0].x;
+  points.forEach(p=>{
+    if(p.y<minY)minY=p.y; if(p.y>maxY)maxY=p.y;
+    if(p.x<minX)minX=p.x; if(p.x>maxX)maxX=p.x;
+  });
+  const spanPx=maxY-minY, chordPx=maxX-minX;
+  const scale=Math.max(spanPx,chordPx)>1?10.0/Math.max(spanPx,chordPx):1.0;
+  const nv=Math.min(points.length,64);
+  const h=new DataView(engine.HEAPU8.buffer);
+  for(let i=0;i<64;i++){
+    const val=i<nv?(points[i].x-minX)*scale:0;
+    h.setFloat64(polyPtr+i*8,val,true);
+  }
+  for(let i=0;i<64;i++){
+    const val=i<nv?(maxY-points[i].y)*scale:0;
+    h.setFloat64(polyPtr+512+i*8,val,true);
+  }
+  h.setInt32(polyPtr+1024,nv,true);
+  const dih=parseFloat(document.getElementById('dihedral').value);
+  h.setFloat64(polyPtr+1032,dih,true);
+  h.setInt32(polyPtr+1040,2,true);
+  h.setInt32(polyPtr+1044,8,true);
+  const aoa=parseFloat(document.getElementById('aoa').value);
+  const vel=parseFloat(document.getElementById('velocity').value);
+  engine._run_poly_vlm_solver(resultPtr,polyPtr,aoa,vel);
+  const CL=h.getFloat64(resultPtr,true);
+  const CD=h.getFloat64(resultPtr+8,true);
+  const CM=h.getFloat64(resultPtr+16,true);
+  const LD=h.getFloat64(resultPtr+24,true);
+  document.getElementById('res-cl').textContent=CL.toFixed(4);
+  document.getElementById('res-cd').textContent=CD.toFixed(4);
+  document.getElementById('res-ld').textContent=LD.toFixed(1);
+  document.getElementById('res-cm').textContent=CM.toFixed(4);
+  document.getElementById('box-cl').className='result-box '+(CL>0.6?'warn':CL>0?'good':'bad');
+  document.getElementById('box-ld').className='result-box '+(LD>20?'good':LD>5?'warn':'bad');
+  const v=document.getElementById('verdict');
+  const aoa2=parseFloat(document.getElementById('aoa').value);
+  if(CL<=0){v.textContent='⚠️ No lift — this shape will not fly';v.className='verdict bad';}
+  else if(aoa2>13){v.textContent='🔴 STALL — reduce angle of attack';v.className='verdict bad';}
+  else if(LD<5){v.textContent='⚠️ Poor efficiency — too much drag';v.className='verdict warn';}
+  else if(LD<15){v.textContent='✅ Flyable — moderate efficiency';v.className='verdict good';}
+  else{v.textContent='✅ Excellent — optimised shape';v.className='verdict good';}
+  drawChart(aoa,vel);
+}
+
+function drawChart(currentAoa,vel){
+  if(!engine) return;
+  const c=document.getElementById('chart');
+  const ctx2=c.getContext('2d');
+  c.width=c.offsetWidth*devicePixelRatio;
+  c.height=c.offsetHeight*devicePixelRatio;
+  ctx2.scale(devicePixelRatio,devicePixelRatio);
+  const W=c.offsetWidth,H=c.offsetHeight;
+  const pad={top:8,right:12,bottom:22,left:36};
+  const aoas=[],cls=[];
+  for(let a=-4;a<=20;a+=2){
+    engine._run_poly_vlm_solver(resultPtr,polyPtr,a,vel);
+    const h2=new DataView(engine.HEAPU8.buffer);
+    aoas.push(a); cls.push(h2.getFloat64(resultPtr,true));
+  }
+  const clMin=-0.1,clMax=Math.max(1.4,...cls)+0.1;
+  const px=a=>pad.left+(a+4)/24*(W-pad.left-pad.right);
+  const py=cl=>pad.top+(1-(cl-clMin)/(clMax-clMin))*(H-pad.top-pad.bottom);
+  ctx2.fillStyle='#0d1526';ctx2.fillRect(0,0,W,H);
+  ctx2.strokeStyle='#1a2840';ctx2.lineWidth=1;
+  [-4,0,4,8,12,16,20].forEach(a=>{ctx2.beginPath();ctx2.moveTo(px(a),pad.top);ctx2.lineTo(px(a),H-pad.bottom);ctx2.stroke();});
+  ctx2.strokeStyle='#2a3a5a';
+  ctx2.beginPath();ctx2.moveTo(pad.left,py(0));ctx2.lineTo(W-pad.right,py(0));ctx2.stroke();
+  ctx2.fillStyle='rgba(220,80,80,0.08)';
+  ctx2.fillRect(px(13),pad.top,px(20)-px(13),H-pad.top-pad.bottom);
+  ctx2.strokeStyle='#60aaff';ctx2.lineWidth=2;
+  ctx2.beginPath();
+  aoas.forEach((a,i)=>i===0?ctx2.moveTo(px(a),py(cls[i])):ctx2.lineTo(px(a),py(cls[i])));
+  ctx2.stroke();
+  const nearIdx=aoas.reduce((best,a,i)=>Math.abs(a-currentAoa)<Math.abs(aoas[best]-currentAoa)?i:best,0);
+  ctx2.fillStyle='#60aaff';
+  ctx2.beginPath();ctx2.arc(px(aoas[nearIdx]),py(cls[nearIdx]),4,0,Math.PI*2);ctx2.fill();
+  ctx2.fillStyle='#3a5a8a';ctx2.font='10px Segoe UI';ctx2.textAlign='center';
+  [-4,0,4,8,12,16,20].forEach(a=>ctx2.fillText(a+'°',px(a),H-6));
+}
+
+/* ════════════════════════════════════════
+   BACKEND — Save & Load
+   ════════════════════════════════════════ */
+const API = 'http://localhost:5000/api/designs';
+
+async function saveDesign() {
+  if (!hasShape || points.length < 3) return;
+  const name   = prompt('Name your design:', 'My Wing Design');
+  if (!name) return;
+  const author = prompt('Your name (optional):', 'Anonymous') || 'Anonymous';
+  const CL = parseFloat(document.getElementById('res-cl').textContent) || 0;
+  const CD = parseFloat(document.getElementById('res-cd').textContent) || 0;
+  const LD = parseFloat(document.getElementById('res-ld').textContent) || 0;
+  const payload = {
+    name, author, mode: 'freeform',
+    points: points.map(p=>({x:p.x, y:p.y})),
+    CL, CD, LD_ratio: LD
+  };
+  try {
+    document.getElementById('saveBtn').textContent = '💾 Saving...';
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      const shareURL = `${window.location.origin}/draw.html?id=${data.id}`;
+      alert(`✅ Design saved!\n\nShare this link:\n${shareURL}`);
+      document.getElementById('saveBtn').textContent = '✅ Saved';
+    } else {
+      alert('Save failed: ' + data.error);
+      document.getElementById('saveBtn').textContent = '💾 Save';
+    }
+  } catch(e) {
+    alert('Backend not reachable — is the server running on port 5000?');
+    document.getElementById('saveBtn').textContent = '💾 Save';
+  }
+}
+
+async function showGallery() {
+  try {
+    const res  = await fetch(API);
+    const data = await res.json();
+    if (!data.success || data.designs.length === 0) {
+      alert('No saved designs yet — save one first!');
+      return;
+    }
+    let msg = '📂 Saved Designs:\n\n';
+    data.designs.forEach((d,i) => {
+      msg += `${i+1}. ${d.name} by ${d.author}\n`;
+      msg += `   CL=${d.CL?.toFixed(3)}  L/D=${d.LD_ratio?.toFixed(1)}\n`;
+      msg += `   ${window.location.origin}/draw.html?id=${d._id}\n\n`;
+    });
+    alert(msg);
+  } catch(e) {
+    alert('Backend not reachable — is the server running on port 5000?');
+  }
+}
+
+/* enable save when shape closes */
+const _origClose = closeShape;
+closeShape = function() {
+  _origClose();
+  document.getElementById('saveBtn').disabled = false;
+};
+
+/* also enable when preset loads */
+const _origPreset = loadPreset;
+loadPreset = function(name) {
+  _origPreset(name);
+  document.getElementById('saveBtn').disabled = false;
+};
+
+/* auto-load from URL ?id= */
+(async () => {
+  const id = new URLSearchParams(window.location.search).get('id');
+  if (!id) return;
+  try {
+    const res  = await fetch(`${API}/${id}`);
+    const data = await res.json();
+    if (data.success && data.design.points) {
+      points   = data.design.points.map(p=>({x:p.x, y:p.y}));
+      closed   = true; hasShape = true;
+      document.getElementById('saveBtn').disabled  = false;
+      document.getElementById('btn-3d').disabled   = false;
+      setMode('edit');
+      document.getElementById('hint').textContent =
+        `Loaded: "${data.design.name}" by ${data.design.author}`;
+      redraw();
+      const wait = setInterval(()=>{ if(engine){ simulate(); clearInterval(wait); } }, 100);
+    }
+  } catch(e) { console.log('Could not load design:', e); }
+})();
+
+</script>
+</body>
+</html>
+
+
+
+<!-- MODIFIED draw.html with View in 3D button that saves to localstorage -->

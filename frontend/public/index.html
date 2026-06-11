@@ -10,7 +10,34 @@
     header { display: flex; align-items: center; gap: 12px; padding: 16px 32px; border-bottom: 1px solid #1e2d4a; background: #0d1220; }
     header h1 { font-size: 22px; font-weight: 700; color: #60aaff; letter-spacing: 1px; }
     header span { font-size: 12px; color: #3a5a8a; margin-left: 4px; }
+
+    /* ── CUSTOM SHAPE BANNER ── */
+    #custom-banner {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 24px;
+      background: linear-gradient(90deg, #0a1e10 0%, #0d1e30 100%);
+      border-bottom: 1px solid #1a5a2a;
+      font-size: 13px;
+    }
+    #custom-banner .badge {
+      background: #1a5a2a; color: #40cc80;
+      padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+    }
+    #custom-banner .msg { color: #80d0a0; flex: 1; }
+    #custom-banner .msg b { color: #40cc80; }
+    #custom-banner .dismiss {
+      padding: 5px 14px; background: #0d1526; border: 1px solid #1e2d4a;
+      color: #6a7a9a; border-radius: 6px; font-size: 12px; cursor: pointer;
+      text-decoration: none; white-space: nowrap; transition: all 0.15s;
+    }
+    #custom-banner .dismiss:hover { background: #1a2840; color: #c0d0f0; border-color: #2a4a6a; }
+
     .layout { display: grid; grid-template-columns: 320px 1fr; height: calc(100vh - 57px); }
+    #custom-banner ~ .layout { height: calc(100vh - 57px - 44px); }
+
     .sidebar { background: #0d1220; border-right: 1px solid #1e2d4a; overflow-y: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
     .section-title { font-size: 11px; font-weight: 600; color: #3a5a8a; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
     .card { background: #131929; border: 1px solid #1e2d4a; border-radius: 10px; padding: 12px; }
@@ -19,9 +46,22 @@
     .control-group label { display: flex; justify-content: space-between; font-size: 12px; color: #6a7a9a; margin-bottom: 5px; }
     .control-group label span { color: #c0d0f0; font-weight: 600; }
     input[type=range] { width: 100%; accent-color: #60aaff; height: 4px; }
+
+    /* disabled sliders in custom mode */
+    .param-card { transition: opacity 0.3s; }
+    .param-card.locked { opacity: 0.35; pointer-events: none; }
+    .param-card.locked::after {
+      content: '🔒 Controlled by custom shape';
+      display: block; margin-top: 10px;
+      font-size: 11px; color: #3a6a3a; text-align: center;
+    }
+
     .run-btn { width: 100%; padding: 11px; background: #1a4fd6; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
     .run-btn:hover { background: #2260ff; }
     .run-btn:disabled { background: #1e2d4a; color: #3a4a6a; cursor: not-allowed; }
+    .draw-btn { width: 100%; padding: 9px; background: #0e2a40; color: #60aaff; border: 1px solid #1e4a6a; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none; display: block; transition: all 0.15s; }
+    .draw-btn:hover { background: #1a3a5a; border-color: #2a6aaa; }
+
     .status { font-size: 11px; text-align: center; margin-top: 8px; color: #3a6a9a; }
     .status.ready { color: #40cc80; }
     .status.error { color: #e05050; }
@@ -33,11 +73,20 @@
     .result-box.warn .rnum { color: #f0a030; }
     .result-box.bad  .rnum { color: #e05050; }
     .result-box .runit { font-size: 10px; color: #2a3a5a; margin-top: 2px; }
+    .verdict { padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 600; text-align: center; margin-top: 4px; }
+    .verdict.good { background: #0a2a14; color: #40cc80; border: 1px solid #1a4a24; }
+    .verdict.warn { background: #2a1a00; color: #f0a030; border: 1px solid #4a3000; }
+    .verdict.bad  { background: #2a0a0a; color: #e05050; border: 1px solid #4a1a1a; }
+    .verdict.idle { background: #131929; color: #3a5a8a; border: 1px solid #1e2d4a; }
+
     .viewport { display: grid; grid-template-rows: 1fr 200px; background: #080c16; }
     #three-canvas { width: 100%; height: 100%; display: block; }
     .chart-panel { background: #0d1220; border-top: 1px solid #1e2d4a; padding: 12px 20px; }
     .chart-panel h3 { font-size: 11px; color: #3a5a8a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
     canvas#chart { width: 100%; height: 150px; display: block; }
+
+    /* shape name preview thumbnail */
+    #shape-thumb { width: 100%; height: 90px; display: block; border-radius: 6px; background: #080c16; border: 1px solid #1e2d4a; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -47,9 +96,25 @@
   <span>Wing Aerodynamics Simulator — C + WebAssembly + Three.js</span>
 </header>
 
+<!-- injected by JS when custom shape is present -->
+<div id="custom-banner">
+  <span class="badge">✦ Custom Shape</span>
+  <span class="msg" id="banner-msg">Rendering your hand-drawn wing in 3D…</span>
+  <a href="draw.html" class="dismiss">✏️ Edit in Designer</a>
+  <button class="dismiss" onclick="clearCustomShape()">✕ Use parametric</button>
+</div>
+
 <div class="layout">
   <div class="sidebar">
-    <div class="card">
+
+    <!-- custom shape preview card (hidden by default) -->
+    <div class="card" id="custom-card" style="display:none">
+      <div class="section-title">Your Custom Shape</div>
+      <canvas id="shape-thumb"></canvas>
+      <div style="margin-top:8px; font-size:11px; color:#3a6a5a; text-align:center;" id="custom-pts-label"></div>
+    </div>
+
+    <div class="card param-card" id="geom-card">
       <div class="section-title">Wing Geometry</div>
       <div class="control-group">
         <label>Wingspan <span id="spanVal">10.0 m</span></label>
@@ -77,11 +142,13 @@
       <div class="section-title">Flight Conditions</div>
       <div class="control-group">
         <label>Angle of Attack <span id="aoaVal">5°</span></label>
-        <input type="range" id="aoa" min="-5" max="20" value="5" step="0.5" oninput="update('aoa','aoaVal',this.value,'°')">
+        <input type="range" id="aoa" min="-5" max="20" value="5" step="0.5"
+          oninput="update('aoa','aoaVal',this.value,'°'); rebuildIfCustom()">
       </div>
       <div class="control-group">
         <label>Airspeed <span id="velVal">50 m/s</span></label>
-        <input type="range" id="velocity" min="10" max="300" value="50" step="5" oninput="update('velocity','velVal',this.value,' m/s')">
+        <input type="range" id="velocity" min="10" max="300" value="50" step="5"
+          oninput="update('velocity','velVal',this.value,' m/s'); rebuildIfCustom()">
       </div>
     </div>
 
@@ -100,9 +167,11 @@
           <div class="runit">Newtons</div>
         </div>
       </div>
+      <div class="verdict idle" id="verdict" style="margin-top:10px">Calculating…</div>
     </div>
 
     <button class="run-btn" id="runBtn" onclick="runSolver()" disabled>Loading engine...</button>
+    <a href="draw.html" class="draw-btn">✏️ Design a custom shape</a>
     <div class="status" id="status">Initializing WebAssembly...</div>
   </div>
 
@@ -119,33 +188,137 @@
 <script src="aero.js"></script>
 <script>
 
-/* ── STATE ── */
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
 const vals = { span:10, root_chord:1.5, tip_chord:1.5, sweep:0, dihedral:0, aoa:5, velocity:50 };
+
+// Custom shape loaded from draw.html via localStorage
+let customShape = null;   // { points:[{cx,sy}], aoa, velocity, dihedral }
 
 function update(key, labelId, val, unit) {
   vals[key] = parseFloat(val);
   document.getElementById(labelId).textContent = val + unit;
+  if (engine && !customShape) { runSolver(); buildWing(); buildStreamlines(); }
+}
+
+function rebuildIfCustom() {
+  if (engine && customShape) { runCustomSolver(); buildCustomWing(); buildStreamlines(); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CUSTOM SHAPE — load / clear
+═══════════════════════════════════════════════════════════════════ */
+function loadCustomShape() {
+  try {
+    const raw = localStorage.getItem('aeroforge_custom_shape');
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    if (!data.points || data.points.length < 3) return false;
+    customShape = data;
+
+    // pre-fill flight condition sliders from draw.html values
+    if (data.aoa !== undefined) {
+      vals.aoa = data.aoa;
+      document.getElementById('aoa').value = data.aoa;
+      document.getElementById('aoaVal').textContent = data.aoa + '°';
+    }
+    if (data.velocity !== undefined) {
+      vals.velocity = data.velocity;
+      document.getElementById('velocity').value = data.velocity;
+      document.getElementById('velVal').textContent = data.velocity + ' m/s';
+    }
+    if (data.dihedral !== undefined) {
+      vals.dihedral = data.dihedral;
+    }
+
+    // show banner
+    const banner = document.getElementById('custom-banner');
+    banner.style.display = 'flex';
+    document.getElementById('banner-msg').innerHTML =
+      `Rendering your hand-drawn wing — <b>${data.points.length} points</b> · AoA ${vals.aoa}° · ${vals.velocity} m/s`;
+
+    // lock geometry sliders, show custom card
+    document.getElementById('geom-card').classList.add('locked');
+    document.getElementById('custom-card').style.display = 'block';
+    document.getElementById('custom-pts-label').textContent =
+      data.points.length + ' control points';
+
+    // draw thumbnail
+    drawThumb(data.points);
+    return true;
+  } catch(e) {
+    console.warn('Could not load custom shape:', e);
+    return false;
+  }
+}
+
+function clearCustomShape() {
+  localStorage.removeItem('aeroforge_custom_shape');
+  customShape = null;
+  document.getElementById('custom-banner').style.display = 'none';
+  document.getElementById('custom-card').style.display = 'none';
+  document.getElementById('geom-card').classList.remove('locked');
+  // rebuild with parametric
   if (engine) { runSolver(); buildWing(); buildStreamlines(); }
 }
 
-/* ── WASM ── */
-let engine=null, wingPtr=null, resultPtr=null;
-const WING_SIZE=48, RESULT_SIZE=44;
+function drawThumb(pts) {
+  const c = document.getElementById('shape-thumb');
+  const ctx = c.getContext('2d');
+  c.width = c.offsetWidth * devicePixelRatio || 260 * devicePixelRatio;
+  c.height = c.offsetHeight * devicePixelRatio || 90 * devicePixelRatio;
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const W = c.offsetWidth || 260, H = c.offsetHeight || 90;
+  const pad = 10;
+  ctx.fillStyle = '#080c16'; ctx.fillRect(0,0,W,H);
+  // pts are {cx:[0..1], sy:[0..1]}
+  // map: cx -> x axis, sy -> y axis
+  const sx = (W - pad*2), sy2 = (H - pad*2);
+  ctx.beginPath();
+  pts.forEach((p, i) => {
+    const x = pad + p.cx * sx;
+    const y = pad + p.sy * sy2;
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(26,79,214,0.25)'; ctx.fill();
+  ctx.strokeStyle = '#60aaff'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WASM
+═══════════════════════════════════════════════════════════════════ */
+let engine=null, wingPtr=null, resultPtr=null, polyPtr=null;
+const WING_SIZE=48, RESULT_SIZE=48, POLY_SIZE=1048;
 
 AeroEngine().then(mod => {
   engine    = mod;
   wingPtr   = mod._malloc(WING_SIZE);
   resultPtr = mod._malloc(RESULT_SIZE);
+  polyPtr   = mod._malloc(POLY_SIZE);
   document.getElementById('runBtn').disabled    = false;
   document.getElementById('runBtn').textContent = 'Run Simulation';
   document.getElementById('status').textContent = 'Engine ready ✓';
   document.getElementById('status').className   = 'status ready';
-  runSolver(); buildWing(); buildStreamlines();
+
+  // now try to load custom shape, else run parametric
+  const hadCustom = loadCustomShape();
+  if (hadCustom) {
+    runCustomSolver();
+    buildCustomWing();
+  } else {
+    runSolver();
+    buildWing();
+  }
+  buildStreamlines();
+  drawChart();
 }).catch(e => {
   document.getElementById('status').textContent = 'Engine failed: ' + e;
   document.getElementById('status').className   = 'status error';
 });
 
+/* ── Parametric wing helpers ── */
 function writeWing(mod, ptr, g) {
   const h = new DataView(mod.HEAPU8.buffer); let o = ptr;
   h.setFloat64(o, g.span,       true); o+=8;
@@ -173,24 +346,84 @@ function runSolver() {
   writeWing(engine, wingPtr, vals);
   engine._run_vlm_solver(resultPtr, wingPtr, vals.aoa, vals.velocity);
   const r = readResult(engine, resultPtr);
-  displayResults(r);
+  displayResults(r.CL, r.CD, r.CM, r.LD);
   drawChart();
 }
 
-function displayResults(r) {
-  const rho=1.225, S=vals.span*0.5*(vals.root_chord+vals.tip_chord);
-  const q=0.5*rho*vals.velocity*vals.velocity, L=r.CL*q*S;
-  document.getElementById('res-cl').textContent = r.CL.toFixed(4);
-  document.getElementById('res-cd').textContent = r.CD.toFixed(4);
-  document.getElementById('res-ld').textContent = r.LD.toFixed(1);
-  document.getElementById('res-cm').textContent = r.CM.toFixed(4);
-  document.getElementById('res-lift').textContent = L.toFixed(0)+' N';
-  document.getElementById('box-cl').className  = 'result-box '+(r.CL>0.6?'warn':r.CL>0?'good':'bad');
-  document.getElementById('box-ld').className  = 'result-box '+(r.LD>20?'good':r.LD>5?'warn':'bad');
-  document.getElementById('box-lift').className= 'result-box '+(L>0?'good':'bad');
+/* ── Custom polygon VLM ── */
+function writePolyToWasm(pts) {
+  const n = Math.min(pts.length, 64);
+  const h = new DataView(engine.HEAPU8.buffer);
+  // scale pts to a ~10m wingspan
+  const SCALE = 10.0;
+  for (let i=0; i<64; i++) {
+    // cx=chord axis (0..1), sy=span axis (0..1)
+    // WASM poly VLM expects: x array = chord position, y array = span position
+    const cx = i < n ? pts[i].cx * SCALE : 0;
+    const sy = i < n ? pts[i].sy * SCALE : 0;
+    h.setFloat64(polyPtr + i*8,       cx, true);   // x (chord)
+    h.setFloat64(polyPtr + 512 + i*8, sy, true);   // y (span)
+  }
+  h.setInt32(polyPtr + 1024, n, true);
+  h.setFloat64(polyPtr + 1032, vals.dihedral, true);
+  h.setInt32(polyPtr + 1040, 2, true);
+  h.setInt32(polyPtr + 1044, 8, true);
 }
 
-/* ── THREE.JS SETUP ── */
+function runCustomSolver() {
+  if (!engine || !customShape) return;
+  writePolyToWasm(customShape.points);
+  engine._run_poly_vlm_solver(resultPtr, polyPtr, vals.aoa, vals.velocity);
+  const h = new DataView(engine.HEAPU8.buffer);
+  const CL = h.getFloat64(resultPtr,    true);
+  const CD = h.getFloat64(resultPtr+8,  true);
+  const CM = h.getFloat64(resultPtr+16, true);
+  const LD = h.getFloat64(resultPtr+24, true);
+  displayResults(CL, CD, CM, LD);
+  drawChart();
+  // update banner
+  document.getElementById('banner-msg').innerHTML =
+    `Custom wing · <b>${customShape.points.length} pts</b> · AoA ${vals.aoa}° · ${vals.velocity} m/s · CL = <b>${CL.toFixed(3)}</b> · L/D = <b>${LD.toFixed(1)}</b>`;
+}
+
+function displayResults(CL, CD, CM, LD) {
+  // area estimate
+  let S;
+  if (customShape) {
+    // bounding-box area of normalised pts scaled to 10m wingspan
+    S = 10 * 10 * 0.5; // rough estimate; replace with shoelace if desired
+    const pts = customShape.points;
+    // shoelace on [0..10]² scaled pts
+    let area = 0;
+    for (let i=0; i<pts.length; i++) {
+      const j = (i+1) % pts.length;
+      area += (pts[i].cx * 10) * (pts[j].sy * 10);
+      area -= (pts[j].cx * 10) * (pts[i].sy * 10);
+    }
+    S = Math.abs(area) / 2;
+  } else {
+    S = vals.span * 0.5 * (vals.root_chord + vals.tip_chord);
+  }
+  const rho=1.225, q=0.5*rho*vals.velocity*vals.velocity, L=CL*q*S;
+  document.getElementById('res-cl').textContent = CL.toFixed(4);
+  document.getElementById('res-cd').textContent = CD.toFixed(4);
+  document.getElementById('res-ld').textContent = LD.toFixed(1);
+  document.getElementById('res-cm').textContent = CM.toFixed(4);
+  document.getElementById('res-lift').textContent = L.toFixed(0) + ' N';
+  document.getElementById('box-cl').className   = 'result-box '+(CL>0.6?'warn':CL>0?'good':'bad');
+  document.getElementById('box-ld').className   = 'result-box '+(LD>20?'good':LD>5?'warn':'bad');
+  document.getElementById('box-lift').className = 'result-box '+(L>0?'good':'bad');
+  const v = document.getElementById('verdict');
+  if (CL <= 0)       { v.textContent='⚠️ No lift — this shape will not fly'; v.className='verdict bad'; }
+  else if (vals.aoa>13) { v.textContent='🔴 STALL — reduce angle of attack'; v.className='verdict bad'; }
+  else if (LD < 5)   { v.textContent='⚠️ Poor efficiency — too much drag'; v.className='verdict warn'; }
+  else if (LD < 15)  { v.textContent='✅ Flyable — moderate efficiency'; v.className='verdict good'; }
+  else               { v.textContent='✅ Excellent — optimised shape'; v.className='verdict good'; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THREE.JS SETUP
+═══════════════════════════════════════════════════════════════════ */
 const canvas3d = document.getElementById('three-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true });
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -231,11 +464,14 @@ function updateCamera() {
 }
 updateCamera();
 
-/* ── WING BUILDER ── */
+/* ═══════════════════════════════════════════════════════════════════
+   WING BUILDERS
+═══════════════════════════════════════════════════════════════════ */
 let wingMesh=null, wingEdge=null;
+
+/* ── Parametric wing ── */
 function buildWing() {
-  if (wingMesh) { scene.remove(wingMesh); wingMesh.geometry.dispose(); }
-  if (wingEdge) { scene.remove(wingEdge); wingEdge.geometry.dispose(); }
+  clearWingMeshes();
   const { span, root_chord, tip_chord, sweep, dihedral } = vals;
   const hs=span/2, sw=Math.tan(sweep*Math.PI/180), dh=Math.tan(dihedral*Math.PI/180);
   const geo=new THREE.BufferGeometry();
@@ -259,6 +495,108 @@ function buildWing() {
     }
   }
   addHalf(+1); addHalf(-1);
+  finishWingGeo(geo, positions, colors, indices);
+}
+
+/* ── Custom polygon wing ── */
+function buildCustomWing() {
+  if (!customShape) return;
+  clearWingMeshes();
+
+  const pts = customShape.points; // [{cx,sy}] both in [0..1]
+  const SCALE = 10.0;   // 10 m bounding box
+  const dh = Math.tan(vals.dihedral * Math.PI / 180);
+  const cl_norm = Math.max(0, Math.min(1, (vals.aoa + 5) / 25));
+
+  /*
+   * Strategy: treat the polygon as a planform viewed from above.
+   * cx = chord direction (→ X in Three.js), sy = span direction (→ Z in Three.js)
+   * Centred so the shape sits symmetrically around the origin.
+   *
+   * We extrude the polygon with a thin airfoil profile in the Y (vertical) axis,
+   * then mirror it for the opposite semi-span.
+   *
+   * For simplicity we do a flat mesh (no thickness), which is what the parametric
+   * builder does too — it's a surface, not a solid.
+   */
+
+  // centre the polygon
+  let cx_min=pts[0].cx, cx_max=pts[0].cx, sy_min=pts[0].sy, sy_max=pts[0].sy;
+  pts.forEach(p => {
+    cx_min=Math.min(cx_min,p.cx); cx_max=Math.max(cx_max,p.cx);
+    sy_min=Math.min(sy_min,p.sy); sy_max=Math.max(sy_max,p.sy);
+  });
+  const cx_ctr = (cx_min+cx_max)/2;
+  const sy_ctr = (sy_min+sy_max)/2;
+
+  // Build a flat triangulated mesh via ear-clipping style:
+  // We'll use a grid-sample approach — sample a grid over the bounding box,
+  // keep only points inside the polygon, then build quads.
+  // This gives a uniform mesh that fills the exact planform shape.
+
+  const GRID = 28; // resolution
+  const positions=[], colors=[], indices=[];
+
+  // Convert polygon to flat arrays for point-in-polygon test
+  const px_arr = pts.map(p => (p.cx - cx_ctr) * SCALE);
+  const py_arr = pts.map(p => (p.sy - sy_ctr) * SCALE);
+
+  function pointInPoly(x, y) {
+    let inside = false;
+    for (let i=0, j=pts.length-1; i<pts.length; j=i++) {
+      const xi=px_arr[i], yi=py_arr[i];
+      const xj=px_arr[j], yj=py_arr[j];
+      const intersect = ((yi>y) !== (yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  const xRange = (cx_max - cx_ctr) * SCALE;
+  const yRange = (sy_max - sy_ctr) * SCALE;
+
+  // grid vertex indices map
+  const vidx = {}; // "i,j" -> index in positions array /3
+
+  for (let gi=0; gi<=GRID; gi++) {
+    for (let gj=0; gj<=GRID; gj++) {
+      const gx = -xRange + gi/GRID * xRange * 2;
+      const gy = -yRange + gj/GRID * yRange * 2;
+      if (pointInPoly(gx, gy)) {
+        const key = gi+','+gj;
+        vidx[key] = positions.length/3;
+        const z_dih = Math.abs(gy) * dh;  // dihedral lift
+        positions.push(gx, z_dih, gy);
+        // colour: chord-position based pressure-like gradient
+        const t_chord = (gx + xRange) / (xRange*2); // 0=LE, 1=TE
+        colors.push((1-t_chord)*cl_norm, 0.1, t_chord*0.6+0.1);
+      }
+    }
+  }
+
+  // build quads where all 4 corners exist
+  for (let gi=0; gi<GRID; gi++) {
+    for (let gj=0; gj<GRID; gj++) {
+      const a = vidx[gi+','+gj];
+      const b = vidx[(gi+1)+','+gj];
+      const c = vidx[gi+','+(gj+1)];
+      const d = vidx[(gi+1)+','+(gj+1)];
+      if (a!==undefined && b!==undefined && c!==undefined && d!==undefined) {
+        indices.push(a,b,d, a,d,c);
+      }
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  finishWingGeo(geo, positions, colors, indices);
+}
+
+function clearWingMeshes() {
+  if (wingMesh) { scene.remove(wingMesh); wingMesh.geometry.dispose(); wingMesh=null; }
+  if (wingEdge) { scene.remove(wingEdge); wingEdge.geometry.dispose(); wingEdge=null; }
+}
+
+function finishWingGeo(geo, positions, colors, indices) {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
   geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors,3));
   geo.setIndex(indices);
@@ -274,7 +612,9 @@ function buildWing() {
   scene.add(wingEdge);
 }
 
-/* ── STREAMLINES ── */
+/* ═══════════════════════════════════════════════════════════════════
+   STREAMLINES — work for both modes
+═══════════════════════════════════════════════════════════════════ */
 let streamlineGroup=null, streamParticles=[];
 const NLINES=24, NSEGS=40;
 
@@ -286,17 +626,34 @@ function buildStreamlines() {
   }
   streamlineGroup = new THREE.Group();
   streamParticles = [];
-  const { span, root_chord, tip_chord, sweep, dihedral, aoa } = vals;
-  const hs=span/2, sw=Math.tan(sweep*Math.PI/180), dh=Math.tan(dihedral*Math.PI/180);
+
+  const aoa = vals.aoa;
+  let hs, chord_avg, sw_rad, dh_rad;
+
+  if (customShape) {
+    // derive rough geometry from custom shape bounding box
+    const pts = customShape.points;
+    let cx_min=pts[0].cx,cx_max=pts[0].cx,sy_max=0;
+    pts.forEach(p=>{ cx_min=Math.min(cx_min,p.cx); cx_max=Math.max(cx_max,p.cx); sy_max=Math.max(sy_max,p.sy); });
+    hs         = sy_max * 10 * 0.5;
+    chord_avg  = (cx_max - cx_min) * 10;
+    sw_rad     = 0;
+    dh_rad     = Math.tan(vals.dihedral*Math.PI/180);
+  } else {
+    hs         = vals.span/2;
+    chord_avg  = (vals.root_chord + vals.tip_chord) / 2;
+    sw_rad     = Math.tan(vals.sweep*Math.PI/180);
+    dh_rad     = Math.tan(vals.dihedral*Math.PI/180);
+  }
 
   for (let li=0; li<NLINES; li++) {
     const side  = li < NLINES/2 ? 1 : -1;
-    const etaS  = li < NLINES/2 ? (li/(NLINES/2-1)) : ((li-NLINES/2)/(NLINES/2-1));
-    const c     = root_chord+(tip_chord-root_chord)*etaS;
-    const xle   = etaS*hs*sw;
-    const yPos  = side*etaS*hs;
-    const zPos  = etaS*hs*dh;
-    const points= [];
+    const eta   = li < NLINES/2 ? (li/(NLINES/2-1)) : ((li-NLINES/2)/(NLINES/2-1));
+    const xle   = eta*hs*sw_rad;
+    const yPos  = side*eta*hs;
+    const zBase = eta*hs*dh_rad;
+    const c     = chord_avg;  // simplified: uniform chord for streamlines
+    const streamPts = [];
 
     for (let si=0; si<NSEGS; si++) {
       const t    = si/(NSEGS-1);
@@ -307,15 +664,15 @@ function buildStreamlines() {
         const cl_now=Math.max(0,(aoa+2)/20);
         zDef = Math.sin(u*Math.PI)*c*0.18*cl_now;
       }
-      let jitter=0;
+      let jitter = 0;
       if (aoa>13) jitter=(Math.random()-0.5)*((aoa-13)/7)*c*0.15;
-      points.push(new THREE.Vector3(yPos, zPos+zDef+jitter, xle+xOff));
-    }  /* ← this closing brace was missing */
+      streamPts.push(new THREE.Vector3(yPos, zBase+zDef+jitter, xle+xOff));
+    }
 
-    const curve = new THREE.CatmullRomCurve3(points);
-    const linGeo= new THREE.BufferGeometry().setFromPoints(curve.getPoints(NSEGS));
-    const an    = Math.max(0,Math.min(1,(aoa+5)/25));
-    const col   = new THREE.Color(0.2+an*0.6, 0.7, 1.0-an*0.3);
+    const curve  = new THREE.CatmullRomCurve3(streamPts);
+    const linGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(NSEGS));
+    const an     = Math.max(0, Math.min(1, (aoa+5)/25));
+    const col    = new THREE.Color(0.2+an*0.6, 0.7, 1.0-an*0.3);
     streamlineGroup.add(new THREE.Line(linGeo,
       new THREE.LineBasicMaterial({ color:col, transparent:true, opacity:0.55 })));
 
@@ -329,7 +686,9 @@ function buildStreamlines() {
   scene.add(streamlineGroup);
 }
 
-/* ── STALL WARNING ── */
+/* ═══════════════════════════════════════════════════════════════════
+   STALL WARNING
+═══════════════════════════════════════════════════════════════════ */
 let stallFlash=0;
 function updateStallWarning() {
   if (!wingMesh) return;
@@ -345,7 +704,9 @@ function updateStallWarning() {
   }
 }
 
-/* ── ANIMATE ── */
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATION LOOP
+═══════════════════════════════════════════════════════════════════ */
 let streamT=0, lastTime=performance.now();
 function animateStreamlines(delta) {
   streamT += delta*0.18;
@@ -354,7 +715,6 @@ function animateStreamlines(delta) {
     p.sphere.position.copy(pos);
   });
 }
-
 function resizeRenderer() {
   const w=canvas3d.clientWidth, h=canvas3d.clientHeight;
   if (renderer.domElement.width!==w || renderer.domElement.height!==h) {
@@ -363,7 +723,6 @@ function resizeRenderer() {
     camera.updateProjectionMatrix();
   }
 }
-
 function animate() {
   requestAnimationFrame(animate);
   resizeRenderer();
@@ -375,7 +734,9 @@ function animate() {
 }
 animate();
 
-/* ── CHART ── */
+/* ═══════════════════════════════════════════════════════════════════
+   CHART — works for both modes (uses poly solver for custom)
+═══════════════════════════════════════════════════════════════════ */
 function drawChart() {
   if (!engine) return;
   const canvas=document.getElementById('chart');
@@ -386,11 +747,21 @@ function drawChart() {
   const W=canvas.offsetWidth, H=canvas.offsetHeight;
   const pad={top:10,right:16,bottom:28,left:42};
   const aoas=[], cls=[];
-  for (let a=-4;a<=16;a+=1) {
-    writeWing(engine,wingPtr,vals);
-    engine._run_vlm_solver(resultPtr,wingPtr,a,vals.velocity);
-    aoas.push(a); cls.push(readResult(engine,resultPtr).CL);
+
+  for (let a=-4; a<=16; a+=1) {
+    let CL;
+    if (customShape) {
+      writePolyToWasm(customShape.points);
+      engine._run_poly_vlm_solver(resultPtr, polyPtr, a, vals.velocity);
+      CL = new DataView(engine.HEAPU8.buffer).getFloat64(resultPtr, true);
+    } else {
+      writeWing(engine, wingPtr, vals);
+      engine._run_vlm_solver(resultPtr, wingPtr, a, vals.velocity);
+      CL = readResult(engine, resultPtr).CL;
+    }
+    aoas.push(a); cls.push(CL);
   }
+
   const clMin=-0.1, clMax=1.4;
   function px(a)  { return pad.left+(a+4)/20*(W-pad.left-pad.right); }
   function py(cl) { return pad.top+(1-(cl-clMin)/(clMax-clMin))*(H-pad.top-pad.bottom); }
@@ -400,7 +771,7 @@ function drawChart() {
   [0,0.25,0.5,0.75,1.0].forEach(c=>{ ctx.beginPath(); ctx.moveTo(pad.left,py(c)); ctx.lineTo(W-pad.right,py(c)); ctx.stroke(); });
   ctx.strokeStyle='#2a3a5a';
   ctx.beginPath(); ctx.moveTo(pad.left,py(0)); ctx.lineTo(W-pad.right,py(0)); ctx.stroke();
-  ctx.strokeStyle='#60aaff'; ctx.lineWidth=2;
+  ctx.strokeStyle = customShape ? '#40cc80' : '#60aaff'; ctx.lineWidth=2;
   ctx.beginPath();
   aoas.forEach((a,i)=>i===0?ctx.moveTo(px(a),py(cls[i])):ctx.lineTo(px(a),py(cls[i])));
   ctx.stroke();
@@ -408,12 +779,17 @@ function drawChart() {
   ctx.fillRect(px(14),pad.top,px(16)-px(14),H-pad.top-pad.bottom);
   const idx=Math.round(vals.aoa+4);
   const curCL=cls[Math.max(0,Math.min(cls.length-1,idx))];
-  ctx.fillStyle='#60aaff';
+  ctx.fillStyle = customShape ? '#40cc80' : '#60aaff';
   ctx.beginPath(); ctx.arc(px(vals.aoa),py(curCL),4,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#3a5a8a'; ctx.font='10px Segoe UI'; ctx.textAlign='center';
   [-4,0,4,8,12,16].forEach(a=>ctx.fillText(a+'°',px(a),H-8));
   ctx.textAlign='right';
   [0,0.5,1.0].forEach(c=>ctx.fillText(c.toFixed(1),pad.left-4,py(c)+4));
+  // label
+  if (customShape) {
+    ctx.fillStyle='#40cc80'; ctx.font='10px Segoe UI'; ctx.textAlign='left';
+    ctx.fillText('● Custom shape', pad.left, pad.top+10);
+  }
 }
 
 </script>
